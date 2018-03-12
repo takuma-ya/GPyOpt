@@ -6,6 +6,7 @@ from .sequential import Sequential
 from .batch_random import RandomBatch
 from .batch_local_penalization import LocalPenalization
 from .batch_thompson import ThompsonBatch
+from .synchronous_ts import SynchronousTS
 
 def select_evaluator(name):
     if name == 'sequential':
@@ -16,5 +17,7 @@ def select_evaluator(name):
         return LocalPenalization
     elif name == 'thompson_sampling':
         return ThompsonBatch
+    elif name == 'synchronous_ts':
+        return SynchronousTS
     else:
         raise Exception('Invalid acquisition evaluator selected.')

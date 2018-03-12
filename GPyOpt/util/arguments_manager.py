@@ -2,8 +2,8 @@ from ..models.gpmodel import GPModel, GPModel_MCMC
 from ..models.rfmodel import RFModel
 from ..models.warpedgpmodel import WarpedGPModel
 from ..models.input_warped_gpmodel import InputWarpedGPModel
-from ..core.evaluators import Sequential, RandomBatch, LocalPenalization, ThompsonBatch
-from ..acquisitions import AcquisitionEI, AcquisitionMPI, AcquisitionLCB, AcquisitionEI_MCMC, AcquisitionMPI_MCMC, AcquisitionLCB_MCMC, AcquisitionLP
+from ..core.evaluators import Sequential, RandomBatch, LocalPenalization, ThompsonBatch, SynchronousTS
+from ..acquisitions import AcquisitionEI, AcquisitionMPI, AcquisitionLCB, AcquisitionEI_MCMC, AcquisitionMPI_MCMC, AcquisitionLCB_MCMC, AcquisitionLP, AcquisitionTS
 from ..core.errors import InvalidConfigError
 
 class ArgumentsManager(object):
@@ -28,6 +28,12 @@ class ArgumentsManager(object):
 
         elif batch_size >1 and evaluator_type == 'thompson_sampling':
             return ThompsonBatch(acquisition, batch_size)
+
+        elif batch_size >1 and evaluator_type == 'synchronous_TS':
+            return SynchronousTS(acquisition, batch_size)
+
+        elif batch_size >1 and evaluator_type == 'asynchronous_TS':
+            return Sequential(acquisition)
 
         elif evaluator_type == 'local_penalization':
             if model_type not in ['GP', 'sparseGP', 'GP_MCMC', 'warpedGP']:
@@ -70,6 +76,9 @@ class ArgumentsManager(object):
 
         elif acquisition_type =='LCB_MCMC':
             return AcquisitionLCB_MCMC(model, space, acquisition_optimizer, cost_withGradients, acquisition_weight)
+
+        elif acquisition_type =='Thompson_Sampling':
+            return AcquisitionTS(model, space, acquisition_optimizer, cost_withGradients, acquisition_jitter)
 
         else:
             raise Exception('Invalid acquisition selected.')

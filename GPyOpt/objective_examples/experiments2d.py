@@ -8,6 +8,8 @@ try:
 except:
     pass
 import numpy as np
+import time
+import random
 from ..util.general import reshape
 
 
@@ -111,8 +113,7 @@ class dropwave(function2d):
     '''
     Cosines function
     
-    :param bounds: the box constraints to define the domain in which the function is optimized.
-    :param sd: standard deviation, to generate noisy evaluations of the function.
+    :param bounds: the box constraints to define the domain in which the function is optimized.  :param sd: standard deviation, to generate noisy evaluations of the function.
     '''
     def __init__(self,bounds=None,sd=None):
         self.input_dim = 2
@@ -178,7 +179,7 @@ class branin(function2d):
     :param bounds: the box constraints to define the domain in which the function is optimized.
     :param sd: standard deviation, to generate noisy evaluations of the function.
     '''
-    def __init__(self,bounds=None,a=None,b=None,c=None,r=None,s=None,t=None,sd=None):
+    def __init__(self,bounds=None,a=None,b=None,c=None,r=None,s=None,t=None,sd=None, wait=0):
         self.input_dim = 2
         if bounds is  None: self.bounds = [(-5,10),(1,15)]
         else: self.bounds = bounds
@@ -199,8 +200,11 @@ class branin(function2d):
         self.min = [(-np.pi,12.275),(np.pi,2.275),(9.42478,2.475)] 
         self.fmin = 0.397887
         self.name = 'Branin'
+        self.wait = wait
     
     def f(self,X):
+        t = self.wait * random.random()
+        time.sleep(t)
         X = reshape(X,self.input_dim)
         n = X.shape[0]
         if X.shape[1] != self.input_dim: 

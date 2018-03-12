@@ -39,6 +39,10 @@ class SingleObjective(Objective):
         self.num_evaluations = 0
         self.space = space
         self.objective_name = objective_name
+        self.batch_type = batch_type
+        self.procs = []
+        self.pipes = []
+        self.suggested_samples = []
 
 
     def evaluate(self, x):
@@ -46,8 +50,18 @@ class SingleObjective(Objective):
         Performs the evaluation of the objective at x.
         """
 
+        suggested_sample = x
         if self.n_procs == 1:
             f_evals, cost_evals = self._eval_func(x)
+        elif self.batch_type == 'asynchronous':
+            try:
+                f_evals, cost_evals, suggested_sample = self._asyncronous_batch_evaluation(x)
+            except:
+                if not hasattr(self, 'parallel_error'):
+                    print('Error in parallel computation. Fall back to single process!')
+                else:
+                    self.parallel_error = True
+                f_evals, cost_evals = self._eval_func(x)
         else:
             try:
                 f_evals, cost_evals = self._syncronous_batch_evaluation(x)
@@ -58,7 +72,7 @@ class SingleObjective(Objective):
                     self.parallel_error = True
                 f_evals, cost_evals = self._eval_func(x)
 
-        return f_evals, cost_evals
+        return f_evals, cost_evals, suggested_sample
 
 
     def _eval_func(self, x):
@@ -103,7 +117,44 @@ class SingleObjective(Objective):
     def _asyncronous_batch_evaluation(self,x):
 
         """
-        Performs the evaluation of the function at x while other evaluations are pending.
+        Performs the evaluation of the function at x while other evaluations are pending. 
         """
-        ### --- TODO
-        pass
+        from multiprocessing import Process, Pipe
+
+        cost_evals = []
+        f_evals     = np.empty(shape=[0, 1])
+
+        if len(self.procs) != 0:
+            (p,c) = Pipe()
+            self.pipes.append((p,c))
+            proc = Process(target=spawn(self._eval_func),args=(c,x))
+            self.procs.append(proc)
+            proc.start()
+            self.suggested_samples.append(x)
+        else:
+            divided_samples = [x[i::self.n_procs] for i in range(self.n_procs)]
+            for i in range(self.n_procs):
+                (p,c) = Pipe()
+                self.pipes.append((p,c))
+                proc = Process(target=spawn(self._eval_func),args=(c,divided_samples[i]))
+                proc.start()
+                self.procs.append(proc)
+                self.suggested_samples.append(divided_samples[i])
+
+        # --- parallel evaluation of the function
+        end_n = -1
+        while(1):
+            for i in range(self.n_procs):
+                if not self.procs[i].is_alive():
+                    end_n = i
+            if end_n != -1:
+                break
+        self.procs[end_n].join()
+
+        # --- time of evaluation is set to constant (=1). This is one of the hypothesis of synchronous batch methods.
+        f_evals = self.pipes[end_n][0].recv()[0] # throw away costs
+        del self.procs[end_n]
+        del self.pipes[end_n]
+        suggested_sample = self.suggested_samples[end_n]
+        del self.suggested_samples[end_n]
+        return f_evals, cost_evals, suggested_sample

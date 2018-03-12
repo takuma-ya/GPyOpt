@@ -1,7 +1,7 @@
 # Copyright (c) 2016, the GPyOpt Authors
 # Licensed under the BSD 3-clause license (see LICENSE.txt)
 
-from ..acquisitions import AcquisitionEI, AcquisitionMPI, AcquisitionLCB, AcquisitionEI_MCMC, AcquisitionMPI_MCMC, AcquisitionLCB_MCMC, AcquisitionLP
+from ..acquisitions import AcquisitionEI, AcquisitionMPI, AcquisitionLCB, AcquisitionEI_MCMC, AcquisitionMPI_MCMC, AcquisitionLCB_MCMC, AcquisitionLP, AcquisitionTS
 from ..core.bo import BO
 from ..core.errors import InvalidConfigError
 from ..core.task.space import Design_space, bounds_to_space
@@ -9,7 +9,7 @@ from ..core.task.objective import SingleObjective
 from ..core.task.cost import CostModel
 from ..experiment_design import initial_design
 from ..util.arguments_manager import ArgumentsManager
-from ..core.evaluators import Sequential, RandomBatch, LocalPenalization, ThompsonBatch
+from ..core.evaluators import Sequential, RandomBatch, LocalPenalization, ThompsonBatch, SynchronousTS
 from ..models.gpmodel import GPModel, GPModel_MCMC
 from ..models.rfmodel import RFModel
 from ..models.warpedgpmodel import WarpedGPModel
@@ -75,7 +75,7 @@ class BayesianOptimization(BO):
     def __init__(self, f, domain = None, constraints = None, cost_withGradients = None, model_type = 'GP', X = None, Y = None,
     	initial_design_numdata = 5, initial_design_type='random', acquisition_type ='EI', normalize_Y = True,
         exact_feval = False, acquisition_optimizer_type = 'lbfgs', model_update_interval=1, evaluator_type = 'sequential',
-        batch_size = 1, num_cores = 1, verbosity=False, verbosity_model = False, maximize=False, de_duplication=False, **kwargs):
+        batch_size = 1, batch_type = 'synchronous', num_cores = 1, verbosity=False, verbosity_model = False, maximize=False, de_duplication=False, **kwargs):
 
         self.modular_optimization = False
         self.initial_iter = True
@@ -99,9 +99,12 @@ class BayesianOptimization(BO):
         else: self.objective_name = 'no_name'
         self.batch_size = batch_size
         self.num_cores = num_cores
+        if evaluator_type == 'asynchronous_TS': self.batch_type = 'asynchronous'
+        else: self.batch_type = 'synchronous'
+
         if f is not None:
             self.f = self._sign(f)
-            self.objective = SingleObjective(self.f, self.batch_size,self.objective_name)
+            self.objective = SingleObjective(self.f, self.num_cores, self.objective_name, self.batch_type)
         else:
             self.f = None
             self.objective = None
@@ -188,11 +191,11 @@ class BayesianOptimization(BO):
 
         # Case 1:
         if self.X is None:
-            self.X = initial_design(self.initial_design_type, self.space, self.initial_design_numdata)
-            self.Y, _ = self.objective.evaluate(self.X)
+            self.X_next = initial_design(self.initial_design_type, self.space, self.initial_design_numdata)
+            self.Y, _, self.X = self.objective.evaluate(self.X_next)
         # Case 2
         elif self.X is not None and self.Y is None:
-            self.Y, _ = self.objective.evaluate(self.X)
+            self.Y, _, self.X = self.objective.evaluate(self.X)
 
     def _sign(self,f):
          if self.maximize:

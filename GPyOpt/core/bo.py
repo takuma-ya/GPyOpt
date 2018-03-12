@@ -138,13 +138,13 @@ class BO(object):
                     or (len(self.X) > 1 and self._distance_last_evaluations() <= self.eps)):
                 break
 
-            self.suggested_sample = self._compute_next_evaluations()
-
-            # --- Augment X
-            self.X = np.vstack((self.X,self.suggested_sample))
+            self.X_next = self._compute_next_evaluations()
 
             # --- Evaluate *f* in X, augment Y and update cost function (if needed)
             self.evaluate_objective()
+
+            # --- Augment X
+            self.X = np.vstack((self.X,self.suggested_sample))
 
             # --- Update current evaluation time and function evaluations
             self.cum_time = time.time() - self.time_zero
@@ -190,8 +190,8 @@ class BO(object):
         """
         Evaluates the objective
         """
-        self.Y_new, cost_new = self.objective.evaluate(self.suggested_sample)
-        self.cost.update_cost_model(self.suggested_sample, cost_new)
+        self.Y_new, cost_new, self.suggested_sample = self.objective.evaluate(self.X_next)
+        self.cost.update_cost_model(self.X_next, cost_new)
         self.Y = np.vstack((self.Y,self.Y_new))
 
     def _compute_results(self):
